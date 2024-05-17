@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualización de Datos de Encuesta</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.9.5/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+    <div class="container mt-5">
+        <h2>Resultados de la Encuesta</h2><br><br>
+
+        <div id="filters">
+            <select id="age-filter" class="form-control mb-2">
+                <option value="">Filtrar por edad</option>
+                <option value="18-25">18-25</option>
+                <option value="26-35">26-35</option>
+                <option value="36-45">36-45</option>
+                <option value="46-55">46-55</option>
+                <option value="56-65">56-65</option>
+                <option value="66+">66+</option>
+            </select>
+            <select id="sex-filter" class="form-control mb-2">
+                <option value="">Filtrar por sexo</option>
+                <option value="hombre">Hombre</option>
+                <option value="mujer">Mujer</option>
+            </select>
+            <select id="question-filter" class="form-control mb-2">
+                <option value="">Filtrar por pregunta</option>
+                <option value="Marca temporal">"Marca temporal"</option>
+                <option value="centro">"centro"</option>
+                <option value="grado "> "grado "</option>
+                <option value="red social que más utilizas">"red social que más utilizas"</option>
+                <option value="deporte favorito">"deporte favorito"</option>
+                <option value="animal de compañía "> "animal de compañía "</option>
+                <option value="deportista español preferido">"deportista español preferido"</option>
+                <option value="genero de musica preferido">"genero de musica preferido"</option>
+                <option value="veículo de transorte preferido">"veículo de transorte preferido"</option>
+                <option value="toros">"toros"</option>
+                <option value="saga de peliculas preferidas">"saga de peliculas preferidas"</option>
+            </select>
+        </div>
+    </div><br>
+
+    <div class="container mt-5">
+        <table class="table table-striped mt-3">
+            <thead>
+                <tr>
+                    <th>Edad</th>
+                    <th>Total Value</th>
+                </tr>
+            </thead>
+            <tbody id="survey-results">
+            </tbody>
+        </table>
+    </div>
+
+    <div class="container mt-5">
+        <canvas id="pie-chart" width="400" height="400"></canvas>
+    </div>
+
+    <script>
+        let currentChart = null; // Variable global para almacenar el gráfico actual
+
+        // Evento de carga del documento
+        document.addEventListener('DOMContentLoaded', function () {
+            // Eventos de cambio para los filtros
+            document.getElementById('age-filter').addEventListener('change', loadSurveyData);
+            document.getElementById('sex-filter').addEventListener('change', loadSurveyData);
+            document.getElementById('question-filter').addEventListener('change', loadSurveyData);
+
+            // Cargar los datos al cargar la página
+            loadSurveyData();
+        });
+
+        function loadSurveyData() {
+            fetch('data/students.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error al cargar el archivo JSON');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const ageFilter = document.getElementById('age-filter').value;
+                    const sexFilter = document.getElementById('sex-filter').value;
+                    const questionFilter = document.getElementById('question-filter').value;
+
+                    let filteredData = data;
+                    if (ageFilter) {
+                        filteredData = filteredData.filter(survey => {
+                            const age = survey['¿Qué edad tienes? Introduce un valor numérico.'];
+                            if (ageFilter === '18-25') {
+                                return age >= 18 && age <= 25;
+                            } else if (ageFilter === '26-35') {
+                                return age >= 26 && age <= 35;
+                            } else if (ageFilter === '36-45') {
+                                return age >= 36 && age <= 45;
+                            } else if (ageFilter === '46-55') {
+                                return age >= 46 && age <= 55;
+                            } else if (ageFilter === '56-65') {
+                                return age >= 56 && age <= 65;
+                            } else {
+                                return age >= 66;
+                            }
+                        });
+                    }
+
+                    if (sexFilter) {
+                        filteredData = filteredData.filter(survey => survey['sexo'] === sexFilter);
+                    }
+
+                    if (questionFilter) {
+                        filteredData = filteredData.filter(survey => survey[questionFilter] !== undefined);
+                    }
+
+                    const groupedData = {};
+                    const ageCounts = {};
+
+                    filteredData.forEach(survey => {
+                        const age = survey['¿Qué edad tienes? Introduce un valor numérico.'];
+                        const questionValue = parseFloat(survey[questionFilter]);
+
+                        if (!groupedData[age]) {
+                            groupedData[age] = { totalValue: 0 };
+                            ageCounts[age] = 0;
+                        }
+
+                        ageCounts[age]++;
+                        if (!isNaN(questionValue)) {
+                            groupedData[age].totalValue += questionValue;
+                        }
+                    });
+
+                    const groupedDataArray = Object.keys(groupedData).map(age => ({
+                        age,
+                        totalValue: groupedData[age].totalValue.toFixed(2),
+                        count: ageCounts[age]
+                    }));
+
+                    const resultsContainer = document.getElementById('survey-results');
+                    resultsContainer.innerHTML = '';
+                    groupedDataArray.forEach(group => {
+                        const row = `<tr>
+                                       <td>${group.age}</td>                    
+                                       <td>${group.count}</td>
+                                    </tr>`;
+                        resultsContainer.innerHTML += row;
+                    });
+
+                    if (questionFilter) {
+                        createPieChart(groupedDataArray);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function createPieChart(groupedDataArray) {
+            const labels = groupedDataArray.map(group => group.age);
+            const data = groupedDataArray.map(group => group.count);
+
+            const ctx = document.getElementById('pie-chart').getContext('2d');
+            if (currentChart) {
+                currentChart.destroy();
+            }
+            currentChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            'rgba(255, 99, 132, 0.2)',
+                            'rgba(54, 162, 235, 0.2)',
+                            'rgba(255, 206, 86, 0.2)',
+                            'rgba(75, 192, 192, 0.2)',
+                            'rgba(153, 102, 255, 0.2)',
+                            'rgba(255, 159, 64, 0.2)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    return `${label}: ${value}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+
+</body>
+
+</html>
